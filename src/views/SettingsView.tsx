@@ -4,6 +4,14 @@ import { exportCsvString, exportJsonString, importCanonicalOrMappedCsv, importJs
 
 const APP_VERSION = '1.0.0';
 
+const defaultMapping: CsvMapping = {
+  dateLocal: 'dateLocal',
+  category: 'category',
+  amount: 'amount',
+  paymentSource: 'paymentSource',
+  extraDetail: 'extraDetail'
+};
+
 const downloadFile = (filename: string, content: string, type = 'text/plain') => {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -20,9 +28,20 @@ export function SettingsView() {
   const [csvContent, setCsvContent] = useState('');
   const [mapping, setMapping] = useState<CsvMapping>(() => {
     const raw = localStorage.getItem('csvMapping');
-    return raw
-      ? JSON.parse(raw)
-      : { dateLocal: 'dateLocal', category: 'category', amount: 'amount', paymentSource: 'paymentSource', extraDetail: 'extraDetail' };
+    if (!raw) return defaultMapping;
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<CsvMapping>;
+      return {
+        dateLocal: parsed.dateLocal ?? defaultMapping.dateLocal,
+        category: parsed.category ?? defaultMapping.category,
+        amount: parsed.amount ?? defaultMapping.amount,
+        paymentSource: parsed.paymentSource ?? defaultMapping.paymentSource,
+        extraDetail: parsed.extraDetail ?? defaultMapping.extraDetail
+      };
+    } catch {
+      return defaultMapping;
+    }
   });
 
   const onImportJson = async (file: File) => {

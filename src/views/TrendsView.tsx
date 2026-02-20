@@ -21,9 +21,14 @@ export function TrendsView() {
             .filter((e) => e.dateLocal.startsWith(month) && e.category === category)
             .reduce((s, e) => s + e.amountCents, 0)
         )
-      : [];
+      : months.map(() => 0);
 
-    return months.map((month, i) => ({ month, spend: totals[i] / 100, ma: avg[i] ? avg[i]! / 100 : null, category: categoryTotals[i] / 100 }));
+    return months.map((month, i) => ({
+      month,
+      spend: totals[i] / 100,
+      ma: avg[i] == null ? null : avg[i] / 100,
+      category: categoryTotals[i] / 100
+    }));
   }, [all, months, category]);
 
   return (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { db } from '../db';
@@ -10,7 +10,7 @@ import { nextMonthKey, todayLocal } from '../utils/date';
 export function MonthView() {
   const [monthKey, setMonthKey] = useState(todayLocal().slice(0, 7));
   const [incomeOpen, setIncomeOpen] = useState(false);
-  const entries = useLiveQuery(() => db.expenses.filter((x) => x.dateLocal.startsWith(monthKey)).toArray(), [monthKey]) ?? [];
+  const entries = useLiveQuery(() => db.expenses.where('dateLocal').startsWith(monthKey).toArray(), [monthKey]) ?? [];
   const allEntries = useLiveQuery(() => db.expenses.toArray(), []) ?? [];
   const income = useLiveQuery(() => db.incomes.get(monthKey), [monthKey]);
 
@@ -116,8 +116,13 @@ function IncomeModal({ monthKey, onClose }: { monthKey: string; onClose: () => v
   const current = useLiveQuery(() => db.incomes.get(monthKey), [monthKey]);
   const prevMonth = nextMonthKey(monthKey, -1);
   const prev = useLiveQuery(() => db.incomes.get(prevMonth), [prevMonth]);
-  const [maxIncome, setMaxIncome] = useState(((current?.incomeMaxCents ?? prev?.incomeMaxCents ?? 0) / 100).toFixed(2));
-  const [liisuIncome, setLiisuIncome] = useState(((current?.incomeLiisuCents ?? prev?.incomeLiisuCents ?? 0) / 100).toFixed(2));
+  const [maxIncome, setMaxIncome] = useState('0.00');
+  const [liisuIncome, setLiisuIncome] = useState('0.00');
+
+  useEffect(() => {
+    setMaxIncome(((current?.incomeMaxCents ?? prev?.incomeMaxCents ?? 0) / 100).toFixed(2));
+    setLiisuIncome(((current?.incomeLiisuCents ?? prev?.incomeLiisuCents ?? 0) / 100).toFixed(2));
+  }, [current?.incomeMaxCents, current?.incomeLiisuCents, prev?.incomeMaxCents, prev?.incomeLiisuCents]);
 
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-4">
