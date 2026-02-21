@@ -1,3 +1,4 @@
+import type { Category } from "../types";import { describe, expect, it } from 'vitest';
 import { describe, expect, it } from 'vitest';
 import { calcCategoryAnomalies } from '../utils/anomalies';
 import type { ExpenseEntry } from '../types';
