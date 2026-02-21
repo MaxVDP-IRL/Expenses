@@ -31,7 +31,9 @@ jobs:
         run: npm ci
 
       - name: Build (GitHub Pages base)
-        run: GITHUB_PAGES=1 npm run build
+        run: npm run build
+        env:
+            VITE_GITHUB_PAGES: "1"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
