@@ -1,4 +1,4 @@
-import type { Category } from "../types";import { describe, expect, it } from 'vitest';
+import type { Category } from "../types";
 import { describe, expect, it } from 'vitest';
 import { calcCategoryAnomalies } from '../utils/anomalies';
 import type { ExpenseEntry } from '../types';
@@ -26,7 +26,7 @@ describe('calcCategoryAnomalies', () => {
       makeEntry('2025-09-02', 25000)
     ];
 
-    const categories: Category[] = ['Food shopping'];
+    const categories: Category[] = ['Food shopping']; 
     const result = calcCategoryAnomalies(entries, '2025-09', categories);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('Food shopping');
