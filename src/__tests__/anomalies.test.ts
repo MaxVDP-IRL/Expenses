@@ -25,7 +25,7 @@ describe('calcCategoryAnomalies', () => {
       makeEntry('2025-09-02', 25000)
     ];
 
-    const result = calcCategoryAnomalies(entries, '2025-09', ['Food shopping']);
+    const result = calcCategoryAnomalies(entries, '2025-09', ['Food shopping'] as const);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('Food shopping');
   });
