@@ -56,14 +56,25 @@ Static React app for tracking personal expenses in EUR, persisted locally in Ind
   ```
 
 ### CSV export
-- Expenses section header:
+- Expenses CSV header:
   ```csv
-  dateLocal,category,amount,paymentSource,extraDetail
+  dateLocal,category,amountEur,paymentSource,extraDetail
   ```
-- Income section header:
+- Income CSV header:
   ```csv
-  monthKey,incomeMax,incomeLiisu
+  monthKey,incomeMaxEur,incomeLiisuEur,incomeTotalEur
   ```
+- Export buttons in **Settings → Export** support:
+  - Share CSV (this month)
+  - Share CSV (all data)
+  - Share CSV (income only)
+  - Share CSV (expenses only)
+
+### Export on phone (Google Sheets)
+1. Open **Settings → Export** and tap a **Share CSV** option.
+2. On mobile, the Web Share sheet opens. Choose **Google Drive** (or Files).
+3. Upload/save the CSV, then open it with **Google Sheets**.
+4. If Web Share is not available, the app downloads the CSV directly.
 
 ### CSV import
 1. **Canonical CSV** expected headers:
