@@ -26,7 +26,7 @@ describe('calcCategoryAnomalies', () => {
       makeEntry('2025-09-02', 25000)
     ];
 
-    const categories: Category[] = ['Food shopping']; 
+    const categories = ['Food shopping'] as const satisfies readonly Category[]; 
     const result = calcCategoryAnomalies(entries, '2025-09', categories);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('Food shopping');
