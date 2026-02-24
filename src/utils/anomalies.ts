@@ -10,7 +10,7 @@ export interface Anomaly {
 export const calcCategoryAnomalies = (
   entries: ExpenseEntry[],
   monthKey: string,
-  categories: Category[]
+  categories: readonly Category[]
 ): Anomaly[] => {
   const byMonthCategory = new Map<string, number>();
   for (const entry of entries) {
