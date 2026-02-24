@@ -71,15 +71,25 @@ export const canShareFile = (file: File): boolean => !!navigator.share && !!navi
 
 export const shareOrDownloadXlsx = async (u8: Uint8Array, filename: string): Promise<'shared' | 'downloaded'> => {
   const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  const bytes = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
-  const file = new File([bytes], filename, { type });
+   const file = new File([u8], filename, { type });
 
-  if (canShareFile(file)) {
-    await navigator.share({ files: [file], title: filename });
-    return 'shared';
+  const canShareFiles =
+    !!navigator.share &&
+    !!navigator.canShare &&
+    navigator.canShare({ files: [file] });
+
+  if (canShareFiles) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return 'shared';
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return 'downloaded'; // or return 'shared' with a toast; your choice
+      console.error('Share failed', err);
+      // fall through to download
+    }
   }
 
-  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const url = URL.createObjectURL(new Blob([u8], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
