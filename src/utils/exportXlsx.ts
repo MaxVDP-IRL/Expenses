@@ -63,15 +63,16 @@ export const buildExportWorkbook = (opts: { expenses?: ExpenseEntry[]; incomes?:
 };
 
 export const workbookToU8 = (workbook: XLSX.WorkBook): Uint8Array => {
-  const out = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  const out = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
   return new Uint8Array(out);
 };
 
 export const canShareFile = (file: File): boolean => !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [file] });
 
 export const shareOrDownloadXlsx = async (u8: Uint8Array, filename: string): Promise<'shared' | 'downloaded'> => {
+  const bytes = new Uint8Array(u8);
   const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-   const file = new File([u8], filename, { type });
+   const file = new File([bytes], filename, { type });
 
   const canShareFiles =
     !!navigator.share &&
@@ -89,7 +90,7 @@ export const shareOrDownloadXlsx = async (u8: Uint8Array, filename: string): Pro
     }
   }
 
-  const url = URL.createObjectURL(new Blob([u8], { type }));
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
