@@ -16,7 +16,7 @@ export const buildExpensesCsv = (entries: ExpenseEntry[]): string => {
         csvEscape(entry.category),
         formatEurFromCents(entry.amountCents),
         entry.paymentSource,
-        csvEscape(entry.extraDetail)
+        csvEscape(entry.extraDetail ?? '')
       ].join(',')
     );
   }

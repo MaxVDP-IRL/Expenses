@@ -7,7 +7,7 @@ export const centsToEurNumber = (cents: number): number => Math.round((cents / 1
 
 export const buildExpensesSheetData = (entries: ExpenseEntry[]): AoaRow[] => [
   ['dateLocal', 'category', 'amountEur', 'paymentSource', 'extraDetail'],
-  ...entries.map((entry) => [entry.dateLocal, entry.category, centsToEurNumber(entry.amountCents), entry.paymentSource, entry.extraDetail])
+  ...entries.map((entry) => [entry.dateLocal, entry.category, centsToEurNumber(entry.amountCents), entry.paymentSource, entry.extraDetail ?? ''])
 ];
 
 export const buildIncomeSheetData = (incomeMonths: IncomeMonth[]): AoaRow[] => [

@@ -13,8 +13,8 @@ export function AddExpenseView() {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<Category>('Food shopping');
   const [paymentSource, setPaymentSource] = useState<PaymentSource>('credit_card');
-  const [extraDetail, setExtraDetail] = useState('');
-  const [errors, setErrors] = useState<{ amount?: string; extraDetail?: string }>({});
+  const [extraDetail, setExtraDetail] = useState<string>('');
+  const [errors, setErrors] = useState<{ amount?: string }>({});
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -43,7 +43,6 @@ export function AddExpenseView() {
     const money = parseMoneyToCents(amount);
     const nextErrors: typeof errors = {};
     if (!money.valid) nextErrors.amount = money.error;
-    if (!extraDetail.trim()) nextErrors.extraDetail = 'Extra detail is required.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
@@ -54,7 +53,7 @@ export function AddExpenseView() {
       category,
       amountCents: money.cents,
       paymentSource,
-      extraDetail: extraDetail.trim(),
+      extraDetail: extraDetail.trim() ? extraDetail.trim() : undefined,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -69,7 +68,7 @@ export function AddExpenseView() {
     setCategory(entry.category);
     setPaymentSource(entry.paymentSource);
     setAmount((entry.amountCents / 100).toFixed(2));
-    setExtraDetail(entry.extraDetail);
+    setExtraDetail(entry.extraDetail ?? '');
   };
 
   return (
@@ -129,11 +128,10 @@ export function AddExpenseView() {
           <label className="mb-1 block text-sm">Extra detail</label>
           <input
             className="input"
-            value={extraDetail}
+            value={extraDetail ?? ''}
             onChange={(e) => setExtraDetail(e.target.value)}
-            placeholder="Required"
+            placeholder="Optional"
           />
-          {errors.extraDetail && <p className="mt-1 text-sm text-rose-400">{errors.extraDetail}</p>}
         </div>
 
         <button className="w-full rounded-lg bg-sky-600 py-3 font-medium" onClick={onSave} type="button">
