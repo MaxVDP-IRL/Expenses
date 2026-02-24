@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { calcCategoryAnomalies } from '../utils/anomalies';
 import type { ExpenseEntry } from '../types';
 
-const makeEntry = (dateLocal: string, amountCents: number, category = 'Food shopping'): ExpenseEntry => ({
+const makeEntry = (dateLocal: string, amountCents: number, category: Category = 'Food shopping'): ExpenseEntry => ({
   id: crypto.randomUUID(),
   dateLocal,
   amountCents,
