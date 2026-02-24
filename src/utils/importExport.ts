@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { db } from '../db';
 import { categories, paymentSources, type ExpenseEntry, type ImportReport, type PaymentSource, type Category } from '../types';
+import { buildExpensesCsv, buildIncomeCsv } from './exportCsv';
 
 const categorySet = new Set(categories);
 const paymentSet = new Set(paymentSources);
@@ -10,12 +11,7 @@ export const exportJsonString = async () => JSON.stringify({ expenses: await db.
 export const exportCsvString = async () => {
   const expenses = await db.expenses.toArray();
   const incomes = await db.incomes.toArray();
-  const expenseRows = ['dateLocal,category,amount,paymentSource,extraDetail'];
-  for (const e of expenses) {
-    expenseRows.push([e.dateLocal, e.category, (e.amountCents / 100).toFixed(2), e.paymentSource, JSON.stringify(e.extraDetail)].join(','));
-  }
-  const incomeRows = ['monthKey,incomeMax,incomeLiisu', ...incomes.map((i) => `${i.monthKey},${(i.incomeMaxCents / 100).toFixed(2)},${(i.incomeLiisuCents / 100).toFixed(2)}`)];
-  return `${expenseRows.join('\n')}\n\n${incomeRows.join('\n')}`;
+  return `${buildExpensesCsv(expenses)}\n\n${buildIncomeCsv(incomes)}`;
 };
 
 export const importJsonString = async (content: string) => {
