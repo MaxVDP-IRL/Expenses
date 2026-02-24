@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { db } from '../db';
+import { buildExpensesCsv, buildIncomeCsv, shareOrDownloadCsv } from '../utils/exportCsv';
 import { exportCsvString, exportJsonString, importCanonicalOrMappedCsv, importJsonString, parseCsvRows, type CsvMapping } from '../utils/importExport';
 
 const APP_VERSION = '1.0.0';
@@ -22,8 +23,16 @@ const downloadFile = (filename: string, content: string, type = 'text/plain') =>
   URL.revokeObjectURL(url);
 };
 
+const getCurrentMonthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const isAbortError = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
 export function SettingsView() {
   const [report, setReport] = useState('');
+  const [toast, setToast] = useState('');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvContent, setCsvContent] = useState('');
   const [mapping, setMapping] = useState<CsvMapping>(() => {
@@ -43,6 +52,70 @@ export function SettingsView() {
       return defaultMapping;
     }
   });
+
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(''), 2200);
+  };
+
+  const runShare = async (title: string, items: Array<{ csv: string; filename: string }>) => {
+    if (!items.length) {
+      showToast('No data to export');
+      return;
+    }
+
+    try {
+      let downloadedAny = false;
+      for (const item of items) {
+        const result = await shareOrDownloadCsv(item.csv, item.filename);
+        if (result === 'downloaded') downloadedAny = true;
+      }
+      if (downloadedAny) {
+        showToast('CSV downloaded');
+      } else {
+        showToast(`${title} shared`);
+      }
+    } catch (error) {
+      showToast(isAbortError(error) ? 'Share cancelled' : 'Share failed');
+    }
+  };
+
+  const onShareThisMonth = async () => {
+    const monthKey = getCurrentMonthKey();
+    const [allExpenses, allIncomeMonths] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
+    const expenses = allExpenses.filter((entry) => entry.dateLocal.startsWith(monthKey));
+    const incomes = allIncomeMonths.filter((income) => income.monthKey === monthKey);
+    await runShare('Monthly CSV', [
+      ...(expenses.length ? [{ csv: buildExpensesCsv(expenses), filename: `expenses-${monthKey}.csv` }] : []),
+      ...(incomes.length ? [{ csv: buildIncomeCsv(incomes), filename: `income-${monthKey}.csv` }] : [])
+    ]);
+  };
+
+  const onShareAllData = async () => {
+    const [expenses, incomes] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
+    await runShare('All-data CSV', [
+      ...(expenses.length ? [{ csv: buildExpensesCsv(expenses), filename: 'expenses-all.csv' }] : []),
+      ...(incomes.length ? [{ csv: buildIncomeCsv(incomes), filename: 'income-all.csv' }] : [])
+    ]);
+  };
+
+  const onShareIncomeOnly = async () => {
+    const incomes = await db.incomes.toArray();
+    if (!incomes.length) {
+      showToast('No data to export');
+      return;
+    }
+    await runShare('Income CSV', [{ csv: buildIncomeCsv(incomes), filename: 'income-all.csv' }]);
+  };
+
+  const onShareExpensesOnly = async () => {
+    const expenses = await db.expenses.toArray();
+    if (!expenses.length) {
+      showToast('No data to export');
+      return;
+    }
+    await runShare('Expenses CSV', [{ csv: buildExpensesCsv(expenses), filename: 'expenses-all.csv' }]);
+  };
 
   const onImportJson = async (file: File) => {
     const text = await file.text();
@@ -97,6 +170,24 @@ export function SettingsView() {
         </div>
       </div>
 
+      <div className="card space-y-2">
+        <h2 className="text-lg font-semibold">Export</h2>
+        <div className="grid gap-2">
+          <button className="btn text-left" type="button" onClick={onShareThisMonth}>
+            Share CSV (this month)
+          </button>
+          <button className="btn text-left" type="button" onClick={onShareAllData}>
+            Share CSV (all data)
+          </button>
+          <button className="btn text-left" type="button" onClick={onShareIncomeOnly}>
+            Share CSV (income only)
+          </button>
+          <button className="btn text-left" type="button" onClick={onShareExpensesOnly}>
+            Share CSV (expenses only)
+          </button>
+        </div>
+      </div>
+
       {csvHeaders.length ? (
         <div className="card space-y-2">
           <h3 className="font-semibold">CSV mapping import</h3>
@@ -133,6 +224,12 @@ export function SettingsView() {
         <p className="text-sm text-slate-300">Version {APP_VERSION}</p>
         {report ? <p className="mt-2 text-sm text-slate-200">{report}</p> : null}
       </div>
+
+      {toast ? (
+        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900/95 px-3 py-2 text-sm text-slate-100 shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </section>
   );
 }
