@@ -30,4 +30,22 @@ describe('buildExpensesCsv', () => {
     expect(csv.startsWith('dateLocal,category,amountEur,paymentSource,extraDetail\n')).toBe(true);
     expect(csv).toContain('2026-02-03,Food shopping,12.34,credit_card,"milk, eggs and ""bread""\nweekly run"');
   });
+
+  it('keeps extraDetail column blank when detail is missing', () => {
+    const entries: ExpenseEntry[] = [
+      {
+        id: '2',
+        dateLocal: '2026-02-04',
+        category: 'Transport',
+        amountCents: 500,
+        paymentSource: 'joint_account',
+        createdAt: '2026-02-04T10:00:00.000Z',
+        updatedAt: '2026-02-04T10:00:00.000Z'
+      }
+    ];
+
+    const csv = buildExpensesCsv(entries);
+    expect(csv).toContain('2026-02-04,Transport,5.00,joint_account,');
+  });
+
 });

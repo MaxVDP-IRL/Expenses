@@ -27,6 +27,23 @@ describe('sheet data builders', () => {
     expect(data[1]).toEqual(['2026-02-24', 'Food shopping', 12.34, 'credit_card', 'details']);
   });
 
+
+
+  it('writes empty string for missing extraDetail and keeps amount numeric', () => {
+    const entries: ExpenseEntry[] = [{
+      id: '2',
+      dateLocal: '2026-02-25',
+      category: 'Transport',
+      amountCents: 505,
+      paymentSource: 'joint_account',
+      createdAt: '2026-02-25T10:00:00.000Z',
+      updatedAt: '2026-02-25T10:00:00.000Z'
+    }];
+
+    const data = buildExpensesSheetData(entries);
+    expect(data[1]).toEqual(['2026-02-25', 'Transport', 5.05, 'joint_account', '']);
+    expect(typeof data[1][2]).toBe('number');
+  });
   it('buildIncomeSheetData keeps required header and order', () => {
     const incomes: IncomeMonth[] = [{
       monthKey: '2026-02',
