@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { db } from '../db';
-import { buildExpensesCsv, buildIncomeCsv, shareOrDownloadCsv } from '../utils/exportCsv';
-import { exportCsvString, exportJsonString, importCanonicalOrMappedCsv, importJsonString, parseCsvRows, type CsvMapping } from '../utils/importExport';
+import { buildExportWorkbook, shareOrDownloadXlsx, workbookToU8 } from '../utils/exportXlsx';
+import type { ExpenseEntry, IncomeMonth } from '../types';
+import { exportJsonString, importCanonicalOrMappedCsv, importJsonString, parseCsvRows, type CsvMapping } from '../utils/importExport';
 
 const APP_VERSION = '1.0.0';
 
@@ -58,25 +59,25 @@ export function SettingsView() {
     window.setTimeout(() => setToast(''), 2200);
   };
 
-  const runShare = async (title: string, items: Array<{ csv: string; filename: string }>) => {
-    if (!items.length) {
+  const runShare = async (filename: string, payload: { expenses?: ExpenseEntry[]; incomes?: IncomeMonth[] }) => {
+    const expenses = payload.expenses ?? [];
+    const incomes = payload.incomes ?? [];
+    if (!expenses.length && !incomes.length) {
       showToast('No data to export');
       return;
     }
 
     try {
-      let downloadedAny = false;
-      for (const item of items) {
-        const result = await shareOrDownloadCsv(item.csv, item.filename);
-        if (result === 'downloaded') downloadedAny = true;
-      }
-      if (downloadedAny) {
-        showToast('CSV downloaded');
-      } else {
-        showToast(`${title} shared`);
-      }
+      const wb = buildExportWorkbook({ expenses, incomes });
+      const result = await shareOrDownloadXlsx(workbookToU8(wb), filename);
+      if (result === 'downloaded') showToast('Exported (downloaded)');
     } catch (error) {
-      showToast(isAbortError(error) ? 'Share cancelled' : 'Share failed');
+      if (isAbortError(error)) {
+        showToast('Share cancelled');
+      } else {
+        console.error(error);
+        showToast('Share failed');
+      }
     }
   };
 
@@ -85,36 +86,22 @@ export function SettingsView() {
     const [allExpenses, allIncomeMonths] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
     const expenses = allExpenses.filter((entry) => entry.dateLocal.startsWith(monthKey));
     const incomes = allIncomeMonths.filter((income) => income.monthKey === monthKey);
-    await runShare('Monthly CSV', [
-      ...(expenses.length ? [{ csv: buildExpensesCsv(expenses), filename: `expenses-${monthKey}.csv` }] : []),
-      ...(incomes.length ? [{ csv: buildIncomeCsv(incomes), filename: `income-${monthKey}.csv` }] : [])
-    ]);
+    await runShare(`expenses-income-${monthKey}.xlsx`, { expenses, incomes });
   };
 
   const onShareAllData = async () => {
     const [expenses, incomes] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
-    await runShare('All-data CSV', [
-      ...(expenses.length ? [{ csv: buildExpensesCsv(expenses), filename: 'expenses-all.csv' }] : []),
-      ...(incomes.length ? [{ csv: buildIncomeCsv(incomes), filename: 'income-all.csv' }] : [])
-    ]);
+    await runShare('expenses-income-all.xlsx', { expenses, incomes });
   };
 
   const onShareIncomeOnly = async () => {
     const incomes = await db.incomes.toArray();
-    if (!incomes.length) {
-      showToast('No data to export');
-      return;
-    }
-    await runShare('Income CSV', [{ csv: buildIncomeCsv(incomes), filename: 'income-all.csv' }]);
+    await runShare('income-all.xlsx', { incomes });
   };
 
   const onShareExpensesOnly = async () => {
     const expenses = await db.expenses.toArray();
-    if (!expenses.length) {
-      showToast('No data to export');
-      return;
-    }
-    await runShare('Expenses CSV', [{ csv: buildExpensesCsv(expenses), filename: 'expenses-all.csv' }]);
+    await runShare('expenses-all.xlsx', { expenses });
   };
 
   const onImportJson = async (file: File) => {
@@ -142,9 +129,6 @@ export function SettingsView() {
         <div className="grid gap-2">
           <button className="btn" type="button" onClick={async () => downloadFile('expenses-data.json', await exportJsonString(), 'application/json')}>
             Export JSON
-          </button>
-          <button className="btn" type="button" onClick={async () => downloadFile('expenses-data.csv', await exportCsvString(), 'text/csv')}>
-            Export CSV
           </button>
           <label className="btn cursor-pointer text-center">
             Import JSON
@@ -174,16 +158,16 @@ export function SettingsView() {
         <h2 className="text-lg font-semibold">Export</h2>
         <div className="grid gap-2">
           <button className="btn text-left" type="button" onClick={onShareThisMonth}>
-            Share CSV (this month)
+            Share XLSX (this month)
           </button>
           <button className="btn text-left" type="button" onClick={onShareAllData}>
-            Share CSV (all data)
+            Share XLSX (all data)
           </button>
           <button className="btn text-left" type="button" onClick={onShareIncomeOnly}>
-            Share CSV (income only)
+            Share XLSX (income only)
           </button>
           <button className="btn text-left" type="button" onClick={onShareExpensesOnly}>
-            Share CSV (expenses only)
+            Share XLSX (expenses only)
           </button>
         </div>
       </div>
