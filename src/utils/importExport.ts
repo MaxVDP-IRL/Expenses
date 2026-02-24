@@ -69,11 +69,6 @@ export const importCanonicalOrMappedCsv = async (content: string, mapping?: CsvM
       report.reasons.push(`Row ${i + 2}: invalid payment source`);
       continue;
     }
-    if (!extraDetail) {
-      report.skipped += 1;
-      report.reasons.push(`Row ${i + 2}: missing detail`);
-      continue;
-    }
     if (!Number.isFinite(cents) || cents <= 0) {
       report.skipped += 1;
       report.reasons.push(`Row ${i + 2}: invalid amount`);

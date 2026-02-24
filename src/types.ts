@@ -2,6 +2,13 @@ export const categories = [
   'Food shopping',
   'Lunch',
   'Bills',
+  'Gas',
+  'Gas Service',
+  'Internet, phone, TV',
+  'Security',
+  'Electricity',
+  'Water',
+  'Subscriptions',
   'Petrol',
   'Transport',
   'Holiday',
@@ -33,7 +40,7 @@ export interface ExpenseEntry {
   category: Category;
   amountCents: number;
   paymentSource: PaymentSource;
-  extraDetail: string;
+  extraDetail?: string;
   createdAt: string;
   updatedAt: string;
 }
