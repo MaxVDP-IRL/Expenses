@@ -5,18 +5,28 @@ import { db } from '../db';
 import { categories } from '../types';
 import { calcCategoryAnomalies } from '../utils/anomalies';
 import { formatEur } from '../utils/money';
+import { hasComment } from '../utils/expenseMutations';
+import { ensureRecurringExpensesForMonth, sortExpenses, type SortDirection, type SortField } from '../utils/expenses';
 import { nextMonthKey, todayLocal } from '../utils/date';
 
 export function MonthView() {
   const [monthKey, setMonthKey] = useState(todayLocal().slice(0, 7));
   const [incomeOpen, setIncomeOpen] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const entries = useLiveQuery(() => db.expenses.where('dateLocal').startsWith(monthKey).toArray(), [monthKey]) ?? [];
   const allEntries = useLiveQuery(() => db.expenses.toArray(), []) ?? [];
   const income = useLiveQuery(() => db.incomes.get(monthKey), [monthKey]);
 
+  useEffect(() => {
+    ensureRecurringExpensesForMonth(monthKey);
+  }, [monthKey]);
+
   const totalSpend = entries.reduce((sum, entry) => sum + entry.amountCents, 0);
   const totalIncome = (income?.incomeMaxCents ?? 0) + (income?.incomeLiisuCents ?? 0);
   const net = totalIncome - totalSpend;
+
+  const sortedEntries = useMemo(() => sortExpenses(entries, sortField, sortDirection), [entries, sortDirection, sortField]);
 
   const byCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -52,6 +62,39 @@ export function MonthView() {
           <button className="btn text-sm" type="button" onClick={() => setIncomeOpen(true)}>Edit income</button>
         </div>
         <p className="text-sm text-slate-300">Max: {formatEur(income?.incomeMaxCents ?? 0)} • Liisu: {formatEur(income?.incomeLiisuCents ?? 0)}</p>
+      </div>
+
+      <div className="card space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="mr-auto font-semibold">Expenses</h3>
+          <select className="input w-auto" value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}>
+            <option value="date">Date</option>
+            <option value="category">Category</option>
+            <option value="amount">Amount</option>
+            <option value="paymentSource">Payment source</option>
+          </select>
+          <button className="btn" type="button" onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}>
+            {sortDirection === 'asc' ? 'Asc ↑' : 'Desc ↓'}
+          </button>
+        </div>
+        {sortedEntries.length ? (
+          <div className="space-y-2">
+            {sortedEntries.map((entry) => (
+              <div className="rounded-lg border border-slate-800 p-2 text-sm" key={entry.id}>
+                <div className="flex justify-between gap-2">
+                  <span className="font-medium">{entry.category}</span>
+                  <span>{formatEur(entry.amountCents)}</span>
+                </div>
+                <div className="text-slate-300">
+                  {entry.dateLocal} • {entry.paymentSource === 'credit_card' ? 'Credit card' : 'Joint account'}
+                </div>
+                {hasComment(entry) ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-slate-400">{entry.extraDetail}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No expenses for this month.</p>
+        )}
       </div>
 
       <div className="card">
