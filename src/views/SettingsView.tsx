@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { v4 as uuid } from 'uuid';
 import { db } from '../db';
 import { buildExportWorkbook, shareOrDownloadXlsx, workbookToU8 } from '../utils/exportXlsx';
-import type { ExpenseEntry, IncomeMonth } from '../types';
+import type { ExpenseEntry, IncomeMonth, RecurringExpenseTemplate, Category, PaymentSource } from '../types';
+import { categories, paymentSources } from '../types';
 import { exportJsonString, importCanonicalOrMappedCsv, importJsonString, parseCsvRows, type CsvMapping } from '../utils/importExport';
+import { nowIso } from '../utils/date';
 
 const APP_VERSION = '1.0.0';
 
@@ -53,6 +57,10 @@ export function SettingsView() {
       return defaultMapping;
     }
   });
+
+  const recurringTemplates = useLiveQuery(() => db.recurringTemplates.orderBy('createdAt').reverse().toArray(), []);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -124,6 +132,64 @@ export function SettingsView() {
 
   return (
     <section className="space-y-4">
+      <div className="card space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Recurring monthly expenses</h2>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              setEditingTemplateId(null);
+              setEditorOpen(true);
+            }}
+          >
+            Add recurring
+          </button>
+        </div>
+        {recurringTemplates?.length ? recurringTemplates.map((template) => (
+          <div className="rounded-lg border border-slate-800 p-2 text-sm" key={template.id}>
+            <div className="flex justify-between gap-2">
+              <span className="font-medium">{template.category}</span>
+              <span>€{(template.amountCents / 100).toFixed(2)}</span>
+            </div>
+            <div className="text-slate-300">Day {template.dayOfMonth} • {template.paymentSource === 'credit_card' ? 'Credit card' : 'Joint account'}</div>
+            {template.extraDetail ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-slate-400">{template.extraDetail}</p> : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="btn text-xs"
+                onClick={async () => {
+                  await db.recurringTemplates.put({ ...template, isActive: !template.isActive, updatedAt: nowIso() });
+                }}
+                type="button"
+              >
+                {template.isActive ? 'Disable' : 'Enable'}
+              </button>
+              <button
+                className="btn text-xs"
+                onClick={() => {
+                  setEditingTemplateId(template.id);
+                  setEditorOpen(true);
+                }}
+                type="button"
+              >
+                Edit
+              </button>
+              <button
+                className="btn text-xs text-rose-300"
+                onClick={async () => {
+                  if (window.confirm('Delete this recurring template?')) {
+                    await db.recurringTemplates.delete(template.id);
+                  }
+                }}
+                type="button"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )) : <p className="text-sm text-slate-400">No recurring templates yet.</p>}
+      </div>
+
       <div className="card space-y-2">
         <h2 className="text-lg font-semibold">Data tools</h2>
         <div className="grid gap-2">
@@ -214,6 +280,89 @@ export function SettingsView() {
           {toast}
         </div>
       ) : null}
+
+      {editorOpen ? (
+        <RecurringTemplateModal
+          templateId={editingTemplateId}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditingTemplateId(null);
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function RecurringTemplateModal({ templateId, onClose }: { templateId: string | null; onClose: () => void }) {
+  const template = useLiveQuery(() => (templateId ? db.recurringTemplates.get(templateId) : undefined), [templateId]);
+  const [category, setCategory] = useState<Category>('Mortgage');
+  const [paymentSource, setPaymentSource] = useState<PaymentSource>('joint_account');
+  const [amount, setAmount] = useState('0.00');
+  const [dayOfMonth, setDayOfMonth] = useState(1);
+  const [extraDetail, setExtraDetail] = useState('');
+
+  useEffect(() => {
+    if (!template) return;
+    setCategory(template.category);
+    setPaymentSource(template.paymentSource);
+    setAmount((template.amountCents / 100).toFixed(2));
+    setDayOfMonth(template.dayOfMonth);
+    setExtraDetail(template.extraDetail ?? '');
+  }, [template]);
+
+  return (
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-4">
+      <div className="card w-full max-w-sm space-y-3">
+        <h3 className="text-lg font-semibold">{templateId ? 'Edit recurring expense' : 'Add recurring expense'}</h3>
+        <label className="block text-sm">Category
+          <select className="input mt-1" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
+            {categories.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm">Amount (€)
+          <input className="input mt-1" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </label>
+        <label className="block text-sm">Payment source
+          <select className="input mt-1" value={paymentSource} onChange={(e) => setPaymentSource(e.target.value as PaymentSource)}>
+            {paymentSources.map((item) => <option key={item} value={item}>{item === 'credit_card' ? 'Credit card' : 'Joint account'}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm">Day of month
+          <input className="input mt-1" type="number" min={1} max={31} value={dayOfMonth} onChange={(e) => setDayOfMonth(Number(e.target.value))} />
+        </label>
+        <label className="block text-sm">Extra detail
+          <input className="input mt-1" value={extraDetail} onChange={(e) => setExtraDetail(e.target.value)} placeholder="Optional" />
+        </label>
+        <div className="flex gap-2">
+          <button className="btn flex-1" type="button" onClick={onClose}>Cancel</button>
+          <button
+            className="flex-1 rounded-lg bg-sky-600 py-2"
+            type="button"
+            onClick={async () => {
+              const parsed = Math.round(Number(amount.replace(',', '.')) * 100);
+              if (!Number.isFinite(parsed) || parsed <= 0) return;
+              const day = Math.min(31, Math.max(1, Math.round(dayOfMonth)));
+              const timestamp = nowIso();
+              const payload: RecurringExpenseTemplate = {
+                id: templateId ?? uuid(),
+                category,
+                amountCents: parsed,
+                paymentSource,
+                dayOfMonth: day,
+                extraDetail: extraDetail.trim() ? extraDetail.trim() : undefined,
+                isActive: template?.isActive ?? true,
+                createdAt: template?.createdAt ?? timestamp,
+                updatedAt: timestamp
+              };
+              await db.recurringTemplates.put(payload);
+              onClose();
+            }}
+          >
+            {templateId ? 'Save changes' : 'Save recurring'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

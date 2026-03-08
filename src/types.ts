@@ -41,6 +41,20 @@ export interface ExpenseEntry {
   amountCents: number;
   paymentSource: PaymentSource;
   extraDetail?: string;
+  recurringTemplateId?: string;
+  recurringMonthKey?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecurringExpenseTemplate {
+  id: string;
+  category: Category;
+  amountCents: number;
+  paymentSource: PaymentSource;
+  extraDetail?: string;
+  dayOfMonth: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }

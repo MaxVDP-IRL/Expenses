@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { v4 as uuid } from 'uuid';
 import { subDays, format } from 'date-fns';
 import { db } from '../db';
 import type { Category, ExpenseEntry, PaymentSource } from '../types';
 import { categories, paymentSources } from '../types';
 import { nowIso, todayLocal } from '../utils/date';
+import { buildEditedExpense, buildNewExpense, hasComment } from '../utils/expenseMutations';
+import { ensureRecurringExpensesForMonth } from '../utils/expenses';
 import { formatEur, parseMoneyToCents } from '../utils/money';
 
 export function AddExpenseView() {
@@ -17,6 +18,7 @@ export function AddExpenseView() {
   const [errors, setErrors] = useState<{ amount?: string }>({});
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const latestEntries = useLiveQuery(() => db.expenses.orderBy('createdAt').reverse().limit(10).toArray(), []);
   const usage = useLiveQuery(async () => {
@@ -25,6 +27,10 @@ export function AddExpenseView() {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
+  }, []);
+
+  useEffect(() => {
+    ensureRecurringExpensesForMonth(todayLocal().slice(0, 7));
   }, []);
 
   const top6 = useMemo(
@@ -39,6 +45,16 @@ export function AddExpenseView() {
 
   const lastUsed = latestEntries?.[0]?.category;
 
+  const resetForm = () => {
+    setDateLocal(todayLocal());
+    setAmount('');
+    setCategory('Food shopping');
+    setPaymentSource('credit_card');
+    setExtraDetail('');
+    setEditingId(null);
+    setErrors({});
+  };
+
   const onSave = async () => {
     const money = parseMoneyToCents(amount);
     const nextErrors: typeof errors = {};
@@ -47,16 +63,27 @@ export function AddExpenseView() {
     if (Object.keys(nextErrors).length) return;
 
     const timestamp = nowIso();
-    const entry: ExpenseEntry = {
-      id: uuid(),
+    const payload = {
       dateLocal,
       category,
       amountCents: money.cents,
       paymentSource,
       extraDetail: extraDetail.trim() ? extraDetail.trim() : undefined,
-      createdAt: timestamp,
       updatedAt: timestamp
     };
+
+    if (editingId) {
+      const current = await db.expenses.get(editingId);
+      if (!current) {
+        resetForm();
+        return;
+      }
+      await db.expenses.put(buildEditedExpense(current, payload, timestamp));
+      resetForm();
+      return;
+    }
+
+    const entry: ExpenseEntry = buildNewExpense(payload, timestamp);
     await db.expenses.add(entry);
     setAmount('');
     setExtraDetail('');
@@ -64,6 +91,16 @@ export function AddExpenseView() {
   };
 
   const onDuplicate = (entry: ExpenseEntry) => {
+    setEditingId(null);
+    setDateLocal(entry.dateLocal);
+    setCategory(entry.category);
+    setPaymentSource(entry.paymentSource);
+    setAmount((entry.amountCents / 100).toFixed(2));
+    setExtraDetail(entry.extraDetail ?? '');
+  };
+
+  const onEdit = (entry: ExpenseEntry) => {
+    setEditingId(entry.id);
     setDateLocal(entry.dateLocal);
     setCategory(entry.category);
     setPaymentSource(entry.paymentSource);
@@ -74,7 +111,7 @@ export function AddExpenseView() {
   return (
     <section className="space-y-4">
       <div className="card space-y-3">
-        <h2 className="text-lg font-semibold">Add expense</h2>
+        <h2 className="text-lg font-semibold">{editingId ? 'Edit expense' : 'Add expense'}</h2>
         <div>
           <label className="mb-1 block text-sm">Date</label>
           <div className="flex gap-2">
@@ -134,9 +171,16 @@ export function AddExpenseView() {
           />
         </div>
 
-        <button className="w-full rounded-lg bg-sky-600 py-3 font-medium" onClick={onSave} type="button">
-          Save expense
-        </button>
+        <div className="flex gap-2">
+          {editingId ? (
+            <button className="btn flex-1" onClick={resetForm} type="button">
+              Cancel
+            </button>
+          ) : null}
+          <button className="flex-1 rounded-lg bg-sky-600 py-3 font-medium" onClick={onSave} type="button">
+            {editingId ? 'Save changes' : 'Save expense'}
+          </button>
+        </div>
       </div>
 
       <div className="card space-y-2">
@@ -145,11 +189,15 @@ export function AddExpenseView() {
           latestEntries.map((entry) => (
             <div className="rounded-lg border border-slate-800 p-2 text-sm" key={entry.id}>
               <div className="flex justify-between gap-2">
-                <span>{entry.dateLocal}</span>
+                <span className="font-medium">{entry.category}</span>
                 <span>{formatEur(entry.amountCents)}</span>
               </div>
-              <div className="text-slate-300">{entry.category} • {entry.paymentSource === 'credit_card' ? 'Credit card' : 'Joint account'}</div>
+              <div className="text-slate-300">
+                {entry.dateLocal} • {entry.paymentSource === 'credit_card' ? 'Credit card' : 'Joint account'}
+              </div>
+              {hasComment(entry) ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-slate-400">{entry.extraDetail}</p> : null}
               <div className="mt-2 flex gap-2">
+                <button className="btn text-xs" onClick={() => onEdit(entry)} type="button">Edit</button>
                 <button className="btn text-xs" onClick={() => onDuplicate(entry)} type="button">Duplicate</button>
                 <button
                   className="btn text-xs text-rose-300"
