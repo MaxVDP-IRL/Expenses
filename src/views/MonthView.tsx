@@ -104,7 +104,15 @@ export function MonthView() {
             <BarChart data={byCategory.map(([name, value]) => ({ name, value: value / 100 }))}>
               <XAxis dataKey="name" hide />
               <YAxis />
-              <Tooltip />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#020617',
+                  border: '1px solid #334155',
+                  borderRadius: '0.5rem'
+                }}
+                labelStyle={{ color: '#0ea5e9' }}
+                itemStyle={{ color: '#0ea5e9' }}
+              />
               <Bar dataKey="value" fill="#0ea5e9" />
             </BarChart>
           </ResponsiveContainer>
