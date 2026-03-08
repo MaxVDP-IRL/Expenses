@@ -7,6 +7,7 @@ export const categories = [
   'Internet, phone, TV',
   'Security',
   'Electricity',
+  'Electricity Service',
   'Water',
   'Subscriptions',
   'Petrol',
