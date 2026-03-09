@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { subDays, format } from 'date-fns';
-import { db } from '../db';
+import { storage } from '../storage';
 import type { Category, ExpenseEntry, PaymentSource } from '../types';
 import { categories, paymentSources } from '../types';
 import { nowIso, todayLocal } from '../utils/date';
@@ -20,9 +20,12 @@ export function AddExpenseView() {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const latestEntries = useLiveQuery(() => db.expenses.orderBy('createdAt').reverse().limit(10).toArray(), []);
+  const latestEntries = useLiveQuery(async () => {
+    const all = await storage.getExpenses();
+    return [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 10);
+  }, []);
   const usage = useLiveQuery(async () => {
-    const all = await db.expenses.toArray();
+    const all = await storage.getExpenses();
     return all.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
@@ -73,18 +76,18 @@ export function AddExpenseView() {
     };
 
     if (editingId) {
-      const current = await db.expenses.get(editingId);
+      const current = (await storage.getExpenses()).find((entry) => entry.id === editingId);
       if (!current) {
         resetForm();
         return;
       }
-      await db.expenses.put(buildEditedExpense(current, payload, timestamp));
+      await storage.updateExpense(buildEditedExpense(current, payload, timestamp));
       resetForm();
       return;
     }
 
     const entry: ExpenseEntry = buildNewExpense(payload, timestamp);
-    await db.expenses.add(entry);
+    await storage.addExpense(entry);
     setAmount('');
     setExtraDetail('');
     setErrors({});
@@ -202,7 +205,7 @@ export function AddExpenseView() {
                 <button
                   className="btn text-xs text-rose-300"
                   onClick={async () => {
-                    if (window.confirm('Delete this expense?')) await db.expenses.delete(entry.id);
+                    if (window.confirm('Delete this expense?')) await storage.deleteExpense(entry.id);
                   }}
                   type="button"
                 >
