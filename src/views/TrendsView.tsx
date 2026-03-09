@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { db } from '../db';
+import { storage } from '../storage';
 import { categories, type Category } from '../types';
 import { monthRangeBack, todayLocal } from '../utils/date';
 import { movingAverage } from '../utils/anomalies';
@@ -9,7 +9,7 @@ import { movingAverage } from '../utils/anomalies';
 export function TrendsView() {
   const [showAvg, setShowAvg] = useState(true);
   const [category, setCategory] = useState<Category | ''>('');
-  const all = useLiveQuery(() => db.expenses.toArray(), []) ?? [];
+  const all = useLiveQuery(() => storage.getExpenses(), []) ?? [];
   const months = monthRangeBack(12, todayLocal().slice(0, 7));
 
   const data = useMemo(() => {

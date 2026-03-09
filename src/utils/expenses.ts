@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { storage } from '../storage';
 import type { ExpenseEntry, RecurringExpenseTemplate } from '../types';
 import { nowIso } from './date';
 
@@ -55,18 +55,15 @@ export const getMissingRecurringExpenses = (
 };
 
 export const ensureRecurringExpensesForMonth = async (monthKey: string) => {
-  const templates = (await db.recurringTemplates.toArray()).filter((template) => template.isActive);
+  const templates = (await storage.getRecurringTemplates()).filter((template) => template.isActive);
   if (!templates.length) return 0;
 
-  let createdCount = 0;
-  await db.transaction('rw', db.expenses, async () => {
-    const existing = await db.expenses.where('recurringMonthKey').equals(monthKey).toArray();
-    const toCreate = getMissingRecurringExpenses(templates, existing, monthKey);
-    for (const entry of toCreate) {
-      await db.expenses.add(entry);
-      createdCount += 1;
-    }
-  });
+  const existing = (await storage.getExpenses()).filter((entry) => entry.recurringMonthKey === monthKey);
+  const toCreate = getMissingRecurringExpenses(templates, existing, monthKey);
 
-  return createdCount;
+  for (const entry of toCreate) {
+    await storage.addExpense(entry);
+  }
+
+  return toCreate.length;
 };

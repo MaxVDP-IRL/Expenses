@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { db } from '../db';
+import { storage } from '../storage';
 import { categories } from '../types';
 import { calcCategoryAnomalies } from '../utils/anomalies';
 import { formatEur } from '../utils/money';
@@ -14,9 +14,9 @@ export function MonthView() {
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const entries = useLiveQuery(() => db.expenses.where('dateLocal').startsWith(monthKey).toArray(), [monthKey]) ?? [];
-  const allEntries = useLiveQuery(() => db.expenses.toArray(), []) ?? [];
-  const income = useLiveQuery(() => db.incomes.get(monthKey), [monthKey]);
+  const entries = useLiveQuery(async () => (await storage.getExpenses()).filter((entry) => entry.dateLocal.startsWith(monthKey)), [monthKey]) ?? [];
+  const allEntries = useLiveQuery(() => storage.getExpenses(), []) ?? [];
+  const income = useLiveQuery(async () => (await storage.getIncomeMonths()).find((item) => item.monthKey === monthKey), [monthKey]);
 
   useEffect(() => {
     ensureRecurringExpensesForMonth(monthKey);
@@ -164,9 +164,9 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function IncomeModal({ monthKey, onClose }: { monthKey: string; onClose: () => void }) {
-  const current = useLiveQuery(() => db.incomes.get(monthKey), [monthKey]);
+  const current = useLiveQuery(async () => (await storage.getIncomeMonths()).find((item) => item.monthKey === monthKey), [monthKey]);
   const prevMonth = nextMonthKey(monthKey, -1);
-  const prev = useLiveQuery(() => db.incomes.get(prevMonth), [prevMonth]);
+  const prev = useLiveQuery(async () => (await storage.getIncomeMonths()).find((item) => item.monthKey === prevMonth), [prevMonth]);
   const [maxIncome, setMaxIncome] = useState('0.00');
   const [liisuIncome, setLiisuIncome] = useState('0.00');
 
@@ -188,7 +188,7 @@ function IncomeModal({ monthKey, onClose }: { monthKey: string; onClose: () => v
             type="button"
             onClick={async () => {
               const toCents = (v: string) => Math.max(0, Math.round(Number(v.replace(',', '.')) * 100) || 0);
-              await db.incomes.put({
+              await storage.updateIncomeMonth({
                 monthKey,
                 incomeMaxCents: toCents(maxIncome),
                 incomeLiisuCents: toCents(liisuIncome),

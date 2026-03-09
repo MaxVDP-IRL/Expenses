@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuid } from 'uuid';
-import { db } from '../db';
+import { clearAllData, storage } from '../storage';
 import { buildExportWorkbook, shareOrDownloadXlsx, workbookToU8 } from '../utils/exportXlsx';
 import type { ExpenseEntry, IncomeMonth, RecurringExpenseTemplate, Category, PaymentSource } from '../types';
 import { categories, paymentSources } from '../types';
@@ -58,7 +58,10 @@ export function SettingsView() {
     }
   });
 
-  const recurringTemplates = useLiveQuery(() => db.recurringTemplates.orderBy('createdAt').reverse().toArray(), []);
+  const recurringTemplates = useLiveQuery(async () => {
+    const all = await storage.getRecurringTemplates();
+    return [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, []);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
@@ -91,24 +94,24 @@ export function SettingsView() {
 
   const onShareThisMonth = async () => {
     const monthKey = getCurrentMonthKey();
-    const [allExpenses, allIncomeMonths] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
+    const [allExpenses, allIncomeMonths] = await Promise.all([storage.getExpenses(), storage.getIncomeMonths()]);
     const expenses = allExpenses.filter((entry) => entry.dateLocal.startsWith(monthKey));
     const incomes = allIncomeMonths.filter((income) => income.monthKey === monthKey);
     await runShare(`expenses-income-${monthKey}.xlsx`, { expenses, incomes });
   };
 
   const onShareAllData = async () => {
-    const [expenses, incomes] = await Promise.all([db.expenses.toArray(), db.incomes.toArray()]);
+    const [expenses, incomes] = await Promise.all([storage.getExpenses(), storage.getIncomeMonths()]);
     await runShare('expenses-income-all.xlsx', { expenses, incomes });
   };
 
   const onShareIncomeOnly = async () => {
-    const incomes = await db.incomes.toArray();
+    const incomes = await storage.getIncomeMonths();
     await runShare('income-all.xlsx', { incomes });
   };
 
   const onShareExpensesOnly = async () => {
-    const expenses = await db.expenses.toArray();
+    const expenses = await storage.getExpenses();
     await runShare('expenses-all.xlsx', { expenses });
   };
 
@@ -158,7 +161,7 @@ export function SettingsView() {
               <button
                 className="btn text-xs"
                 onClick={async () => {
-                  await db.recurringTemplates.put({ ...template, isActive: !template.isActive, updatedAt: nowIso() });
+                  await storage.updateRecurringTemplate({ ...template, isActive: !template.isActive, updatedAt: nowIso() });
                 }}
                 type="button"
               >
@@ -178,7 +181,7 @@ export function SettingsView() {
                 className="btn text-xs text-rose-300"
                 onClick={async () => {
                   if (window.confirm('Delete this recurring template?')) {
-                    await db.recurringTemplates.delete(template.id);
+                    await storage.deleteRecurringTemplate(template.id);
                   }
                 }}
                 type="button"
@@ -210,7 +213,7 @@ export function SettingsView() {
             onClick={async () => {
               const pass = window.prompt('Type DELETE ALL to confirm');
               if (pass === 'DELETE ALL') {
-                await db.delete();
+                await clearAllData();
                 window.location.reload();
               }
             }}
@@ -295,7 +298,10 @@ export function SettingsView() {
 }
 
 function RecurringTemplateModal({ templateId, onClose }: { templateId: string | null; onClose: () => void }) {
-  const template = useLiveQuery(() => (templateId ? db.recurringTemplates.get(templateId) : undefined), [templateId]);
+  const template = useLiveQuery(async () => {
+    if (!templateId) return undefined;
+    return (await storage.getRecurringTemplates()).find((item) => item.id === templateId);
+  }, [templateId]);
   const [category, setCategory] = useState<Category>('Mortgage');
   const [paymentSource, setPaymentSource] = useState<PaymentSource>('joint_account');
   const [amount, setAmount] = useState('0.00');
@@ -355,7 +361,11 @@ function RecurringTemplateModal({ templateId, onClose }: { templateId: string | 
                 createdAt: template?.createdAt ?? timestamp,
                 updatedAt: timestamp
               };
-              await db.recurringTemplates.put(payload);
+              if (templateId) {
+                await storage.updateRecurringTemplate(payload);
+              } else {
+                await storage.addRecurringTemplate(payload);
+              }
               onClose();
             }}
           >
